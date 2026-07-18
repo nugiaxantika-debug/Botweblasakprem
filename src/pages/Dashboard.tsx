@@ -1301,7 +1301,7 @@ export default function Dashboard() {
                       disabled={!manualUserEmail || manualActionStatus === "Memproses..."}
                       className="flex-1 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white font-bold py-2 rounded-xl transition-colors text-sm"
                     >
-                      Putus Sesi Bot
+                      Putus Email Bot
                     </button>
                     <button
                       onClick={() => handleManualAction("extend")}
@@ -1739,6 +1739,7 @@ export default function Dashboard() {
                   <div className="text-center p-4">
                      <ShieldCheck className="w-10 h-10 text-rose-500 mx-auto mb-2" />
                      <p className="text-rose-400 font-bold">Akses Terkunci</p>
+                     <p className="text-sm text-neutral-400 mt-1">Masa aktif paket Anda telah habis.</p>
                   </div>
                 </div>
               )}

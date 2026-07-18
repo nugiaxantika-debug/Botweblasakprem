@@ -196,7 +196,7 @@ async function startServer() {
     res.json({ 
       name: user.name || "", 
       photo: user.photo || "", 
-      registeredAt: user.registeredAt || Date.now(),
+      registeredAt: user.registeredAt !== undefined ? user.registeredAt : Date.now(),
       premiumStatus: user.premiumStatus || false,
       premiumPlan: user.premiumPlan || "",
       premiumStart: user.premiumStart || "",
@@ -345,10 +345,35 @@ async function startServer() {
     if (!targetEmail) return res.status(400).json({ error: "No target email provided" });
 
     if (action === "disconnect") {
+      let found = false;
+      try {
+         const userDoc = await getDoc(doc(adminDb, "users", targetEmail));
+         if (userDoc.exists()) {
+            await setDoc(doc(adminDb, "users", targetEmail), { registeredAt: 0, premiumStatus: false }, { merge: true });
+            found = true;
+         }
+      } catch(e) {}
+      
+      try {
+        if (fs.existsSync("auth.json")) {
+           let users = JSON.parse(fs.readFileSync("auth.json", "utf-8"));
+           let idx = users.findIndex((u: any) => u.email === targetEmail);
+           if (idx > -1) {
+              users[idx].registeredAt = 0;
+              users[idx].premiumStatus = false;
+              fs.writeFileSync("auth.json", JSON.stringify(users, null, 2));
+              found = true;
+           }
+        }
+      } catch(e) {}
+
       if (userBots.has(targetEmail)) {
         await userBots.get(targetEmail)!.deleteSession();
-        return res.json({ success: true, message: "Sesi bot berhasil diputus" });
+        return res.json({ success: true, message: "Akses akun dikunci dan Sesi bot berhasil diputus" });
       } else {
+        if (found) {
+           return res.json({ success: true, message: "Akses akun dikunci (bot sudah tidak aktif)" });
+        }
         return res.json({ success: true, message: "Sesi bot tidak ditemukan (mungkin sudah terputus)" });
       }
     } else if (action === "extend") {
