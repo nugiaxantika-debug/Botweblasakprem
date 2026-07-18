@@ -369,8 +369,10 @@ async function startServer() {
 
       if (userBots.has(targetEmail)) {
         await userBots.get(targetEmail)!.deleteSession();
+        io.to(targetEmail).emit("force_refresh_profile");
         return res.json({ success: true, message: "Akses akun dikunci dan Sesi bot berhasil diputus" });
       } else {
+        io.to(targetEmail).emit("force_refresh_profile");
         if (found) {
            return res.json({ success: true, message: "Akses akun dikunci (bot sudah tidak aktif)" });
         }
@@ -401,6 +403,7 @@ async function startServer() {
       } catch(e) {}
       
       if (found) {
+        io.to(targetEmail).emit("force_refresh_profile");
         return res.json({ success: true, message: "Masa aktif pengguna berhasil diperbarui (di-reset dari hari ini)" });
       } else {
         return res.status(404).json({ error: "Pengguna tidak ditemukan" });

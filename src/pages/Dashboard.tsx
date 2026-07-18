@@ -141,28 +141,37 @@ export default function Dashboard() {
   const [activeUserTab, setActiveUserTab] = useState<"dashboard" | "history">("dashboard");
   const [profileUpdateStatus, setProfileUpdateStatus] = useState<string | null>(null);
   const [isExpired, setIsExpired] = useState(false);
+  const [forceProfileUpdate, setForceProfileUpdate] = useState(0);
 
   useEffect(() => {
-    if (currentUserEmail) {
+    if (!currentUserEmail) return;
+
+    const fetchProfile = () => {
       const apiBaseURL = import.meta.env.VITE_APP_URL || window.location.origin;
       fetch(`${apiBaseURL}/api/user/profile`, {
         headers: { "x-user-email": currentUserEmail }
       })
       .then(res => res.json())
       .then(data => {
-        if (!data.error) setUserProfile({ 
-          name: data.name || "", 
-          photo: data.photo || "", 
-          registeredAt: data.registeredAt || 0,
-          premiumStatus: data.premiumStatus || false,
-          premiumPlan: data.premiumPlan || "",
-          premiumStart: data.premiumStart || "",
-          premiumEnd: data.premiumEnd || ""
-        });
+        if (!data.error) {
+           setUserProfile(prev => ({ 
+             name: prev.name || data.name || "", 
+             photo: prev.photo || data.photo || "", 
+             registeredAt: data.registeredAt !== undefined ? data.registeredAt : prev.registeredAt,
+             premiumStatus: data.premiumStatus || false,
+             premiumPlan: data.premiumPlan || "",
+             premiumStart: data.premiumStart || "",
+             premiumEnd: data.premiumEnd || ""
+           }));
+        }
       })
       .catch(console.error);
-    }
-  }, [currentUserEmail]);
+    };
+
+    fetchProfile();
+    const interval = setInterval(fetchProfile, 10000);
+    return () => clearInterval(interval);
+  }, [currentUserEmail, forceProfileUpdate]);
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,7 +298,21 @@ export default function Dashboard() {
 
   // Simulate auto-disconnect logic based on registeredAt
   useEffect(() => {
-    if (!isAdmin && userProfile.registeredAt > 0) {
+    if (isAdmin) {
+      setIsExpired(false);
+      return;
+    }
+
+    if (userProfile.registeredAt === 0) {
+      setIsExpired(true);
+      if (status === "connected" || status === "connecting") {
+        apiCall("stop");
+        setLogs(prev => [...prev, { time: new Date().toISOString(), message: `[Sistem] Koneksi dihentikan.`}]);
+      }
+      return;
+    }
+
+    if (userProfile.registeredAt > 0) {
       const autoDisc = webConfig.plan1AutoDisconnect;
       const days = webConfig.plan1Days;
       
@@ -297,15 +320,12 @@ export default function Dashboard() {
         const expiresAt = userProfile.registeredAt + (days * 24 * 60 * 60 * 1000);
         if (Date.now() > expiresAt) {
           setIsExpired(true);
-          setDisconnectNotice(`Akses Dashboard Ditutup: Masa aktif paket Anda (${days} hari) telah habis. Silakan perpanjang.`);
           if (status === "connected" || status === "connecting") {
             apiCall("stop");
             setLogs(prev => [...prev, { time: new Date().toISOString(), message: `[Sistem] Koneksi dihentikan.`}]);
           }
         } else {
           setIsExpired(false);
-          // if previously noticed, reset notice?
-          // setDisconnectNotice(null);
         }
       } else {
         setIsExpired(false);
@@ -356,6 +376,10 @@ export default function Dashboard() {
 
     newSocket.on("connect", () => {
       console.log("Connected to WebSocket Server");
+    });
+
+    newSocket.on("force_refresh_profile", () => {
+      setForceProfileUpdate(prev => prev + 1);
     });
 
     newSocket.on("status", (data: StatusPayload) => {
